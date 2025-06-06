@@ -1,0 +1,24 @@
+FROM gradle:8.7-jdk21
+
+WORKDIR /app
+
+COPY app/gradle gradle
+COPY app/build.gradle.kts .
+COPY app/settings.gradle.kts .
+COPY app/gradlew .
+
+RUN ./gradlew --no-daemon dependencies
+
+COPY app/src src
+COPY app/config config
+
+RUN ./gradlew --no-daemon build
+
+FROM eclipse-temurin:21-jre
+
+WORKDIR /app
+
+ENV JAVA_OPTS="-Xmx512M -Xms512M"
+EXPOSE 7070
+
+CMD ["java", "-jar", "app/build/libs/HexletJavalin-1.0-SNAPSHOT-all.jar"]
