@@ -21,4 +21,4 @@ WORKDIR /app
 ENV JAVA_OPTS="-Xmx512M -Xms512M"
 EXPOSE 7070
 
-CMD ["java", "-jar", "app/build/libs/HexletJavalin-1.0-SNAPSHOT-all.jar"]
+CMD ["java", "-jar", "build/libs/HexletJavalin-1.0-SNAPSHOT-all.jar"]
