@@ -8,6 +8,7 @@ plugins {
     id("io.freefair.lombok") version "8.13.1"
     id("com.github.ben-manes.versions") version "0.52.0"
     id("com.github.johnrengelman.shadow") version "8.1.1"
+    id("org.sonarqube") version "6.2.0.5505"
 }
 
 group = "hexlet.code"
@@ -38,6 +39,13 @@ dependencies {
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
+sonar {
+    properties {
+        property("sonar.projectKey", "CherepovAlex_java-project-72")
+        property("sonar.organization", "aleksandrcherepov")
+        property("sonar.host.url", "https://sonarcloud.io")
+    }
+}
 tasks.test {
     useJUnitPlatform()
     // https://technology.lastminute.com/junit5-kotlin-and-gradle-dsl/
