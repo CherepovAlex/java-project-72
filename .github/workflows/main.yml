@@ -33,12 +33,14 @@ jobs:
           path: ~/.gradle/caches
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle') }}
           restore-keys: ${{ runner.os }}-gradle
+      - name: Make gradlew executable
+        working-directory: ./app  # Переходим в папку app
+        run: chmod +x gradlew
       - name: Build and analyze
+        working-directory: ./app   # Все команды запускаем из app/
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: ./gradlew build sonar --info
-      - run: ./gradlew checkstyleMain
-      - run: ./gradlew test
 
 #  deploy:
 #    needs: build
