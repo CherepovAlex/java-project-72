@@ -36,9 +36,9 @@ jobs:
       - name: Build and analyze
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: ./app/gradlew build sonar --info
-      - run: ./app/gradlew checkstyleMain
-      - run: ./app/gradlew test
+        run: ./gradlew build sonar --info
+      - run: ./gradlew checkstyleMain
+      - run: ./gradlew test
 
 #  deploy:
 #    needs: build
