@@ -37,6 +37,8 @@ dependencies {
 
     implementation("org.flywaydb:flyway-core:9.22.3")
 
+    implementation("org.postgresql:postgresql:42.7.3")
+
     testImplementation("org.assertj:assertj-core:3.27.3")
     testImplementation(platform("org.junit:junit-bom:5.12.2"))
     testImplementation("org.junit.jupiter:junit-jupiter")
@@ -50,6 +52,11 @@ sonar {
         property("sonar.host.url", "https://sonarcloud.io")
     }
 }
+
+tasks.withType<JavaExec> {
+    systemProperties = System.getProperties().mapKeys { it.key.toString() }
+}
+
 tasks.test {
     useJUnitPlatform()
     // https://technology.lastminute.com/junit5-kotlin-and-gradle-dsl/

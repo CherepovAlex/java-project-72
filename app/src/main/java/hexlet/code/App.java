@@ -54,36 +54,52 @@ public class App {
     public static Javalin getApp() throws IOException, SQLException {
 
         var hikariConfig = new HikariConfig();
+// Получаем параметры подключения из переменных окружения
         String jdbcUrl = System.getenv("JDBC_DATABASE_URL");
         String dbUser = System.getenv("DB_USER");
         String dbPassword = System.getenv("DB_PASSWORD");
 
-        // Если переменные не заданы (для локальной разработки), используем H2
         if (jdbcUrl == null || jdbcUrl.isEmpty()) {
+            // Режим разработки (H2)
             hikariConfig.setJdbcUrl("jdbc:h2:mem:project;DB_CLOSE_DELAY=-1;");
+            hikariConfig.setDriverClassName("org.h2.Driver");
         } else {
+            // Продакшен режим (PostgreSQL)
             hikariConfig.setJdbcUrl(jdbcUrl);
             hikariConfig.setUsername(dbUser);
             hikariConfig.setPassword(dbPassword);
-            // Оптимальные настройки для PostgreSQL на Render.com
+            hikariConfig.setDriverClassName("org.postgresql.Driver");
+
+            // Оптимальные настройки для Render.com
             hikariConfig.setMaximumPoolSize(5);
+            hikariConfig.setMinimumIdle(2);
             hikariConfig.setIdleTimeout(30000);
+            hikariConfig.setConnectionTimeout(10000);
+            hikariConfig.setLeakDetectionThreshold(30000);
         }
 
         var dataSource = new HikariDataSource(hikariConfig);
-        if (jdbcUrl != null && !jdbcUrl.contains("h2")) {
-            Flyway flyway = Flyway.configure()
-                    .dataSource(dataSource)
-                    .load();
-            flyway.migrate();
+
+// Инициализация базы данных
+        try {
+            if (jdbcUrl != null && !jdbcUrl.contains("h2")) {
+                // Миграции для PostgreSQL
+                Flyway flyway = Flyway.configure()
+                        .dataSource(dataSource)
+                        .baselineOnMigrate(true)
+                        .load();
+                flyway.migrate();
+            } else {
+                // Инициализация схемы для H2
+                var sql = readResourceFile("schema.sql");
+                try (var connection = dataSource.getConnection();
+                     var statement = connection.createStatement()) {
+                    statement.execute(sql);
+                }
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to initialize database", e);
         }
-//        if (jdbcUrl == null || jdbcUrl.contains("h2")) {
-//            var sql = readResourceFile("schema.sql");
-//            try (var connection = dataSource.getConnection();
-//                 var statement = connection.createStatement()) {
-//                statement.execute(sql);
-//            }
-//        }
 
         BaseRepository.dataSource = dataSource;
 
