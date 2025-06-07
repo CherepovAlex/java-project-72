@@ -28,6 +28,7 @@ import hexlet.code.repository.BaseRepository;
 //import hexlet.code.util.NamedRoutes;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
+import org.flywaydb.core.Flyway;
 
 import io.javalin.Javalin;
 //import io.javalin.validation.ValidationException;
@@ -53,24 +54,52 @@ public class App {
     public static Javalin getApp() throws IOException, SQLException {
 
         var hikariConfig = new HikariConfig();
-        hikariConfig.setJdbcUrl("jdbc:h2:mem:project;DB_CLOSE_DELAY=-1;");
+        String jdbcUrl = System.getenv("JDBC_DATABASE_URL");
+        String dbUser = System.getenv("DB_USER");
+        String dbPassword = System.getenv("DB_PASSWORD");
+
+        // Если переменные не заданы (для локальной разработки), используем H2
+        if (jdbcUrl == null || jdbcUrl.isEmpty()) {
+            hikariConfig.setJdbcUrl("jdbc:h2:mem:project;DB_CLOSE_DELAY=-1;");
+        } else {
+            hikariConfig.setJdbcUrl(jdbcUrl);
+            hikariConfig.setUsername(dbUser);
+            hikariConfig.setPassword(dbPassword);
+            // Оптимальные настройки для PostgreSQL на Render.com
+            hikariConfig.setMaximumPoolSize(5);
+            hikariConfig.setIdleTimeout(30000);
+        }
 
         var dataSource = new HikariDataSource(hikariConfig);
-        var sql = readResourceFile("schema.sql");
-
-        log.info(sql);
-
-        try (var connection = dataSource.getConnection();
-             var statement = connection.createStatement()) {
-            statement.execute(sql);
+        if (jdbcUrl != null && !jdbcUrl.contains("h2")) {
+            Flyway flyway = Flyway.configure()
+                    .dataSource(dataSource)
+                    .load();
+            flyway.migrate();
         }
+//        if (jdbcUrl == null || jdbcUrl.contains("h2")) {
+//            var sql = readResourceFile("schema.sql");
+//            try (var connection = dataSource.getConnection();
+//                 var statement = connection.createStatement()) {
+//                statement.execute(sql);
+//            }
+//        }
+
         BaseRepository.dataSource = dataSource;
 
         var app = Javalin.create(config -> {
             config.bundledPlugins.enableDevLogging();
             config.fileRenderer(new JavalinJte());
         });
-        app.get("/", ctx -> ctx.result("Hello World"));
+        app.get("/", ctx -> ctx.result("Hello World with PostgreSQL!"));
+
+        app.get("/health", ctx -> {
+            try (var conn = BaseRepository.dataSource.getConnection()) {
+                ctx.result("Database connection OK");
+            } catch (SQLException e) {
+                ctx.status(500).result("DB connection error: " + e.getMessage());
+            }
+        });
 
         return app;
     }
