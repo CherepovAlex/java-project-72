@@ -54,7 +54,7 @@ public class App {
     public static Javalin getApp() throws IOException, SQLException {
 
         var hikariConfig = new HikariConfig();
-// Получаем параметры подключения из переменных окружения
+
         String jdbcUrl = System.getenv("JDBC_DATABASE_URL");
         String dbUser = System.getenv("DB_USER");
         String dbPassword = System.getenv("DB_PASSWORD");
@@ -64,33 +64,28 @@ public class App {
             hikariConfig.setJdbcUrl("jdbc:h2:mem:project;DB_CLOSE_DELAY=-1;");
             hikariConfig.setDriverClassName("org.h2.Driver");
         } else {
-            // Продакшен режим (PostgreSQL)
+            // Продакшен (PostgreSQL)
             hikariConfig.setJdbcUrl(jdbcUrl);
-            hikariConfig.setUsername(dbUser);
-            hikariConfig.setPassword(dbPassword);
+            hikariConfig.setUsername(dbUser != null ? dbUser : "alexander");
+            hikariConfig.setPassword(dbPassword != null ? dbPassword : "OqBr2SjY2ViDUuYXxvucihu6EmEioIlL");
             hikariConfig.setDriverClassName("org.postgresql.Driver");
 
-            // Оптимальные настройки для Render.com
             hikariConfig.setMaximumPoolSize(5);
             hikariConfig.setMinimumIdle(2);
             hikariConfig.setIdleTimeout(30000);
-            hikariConfig.setConnectionTimeout(10000);
-            hikariConfig.setLeakDetectionThreshold(30000);
         }
 
         var dataSource = new HikariDataSource(hikariConfig);
 
-// Инициализация базы данных
+// Инициализация БД
         try {
             if (jdbcUrl != null && !jdbcUrl.contains("h2")) {
-                // Миграции для PostgreSQL
                 Flyway flyway = Flyway.configure()
                         .dataSource(dataSource)
                         .baselineOnMigrate(true)
                         .load();
                 flyway.migrate();
             } else {
-                // Инициализация схемы для H2
                 var sql = readResourceFile("schema.sql");
                 try (var connection = dataSource.getConnection();
                      var statement = connection.createStatement()) {
