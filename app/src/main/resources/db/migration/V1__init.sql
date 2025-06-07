@@ -1,7 +1,7 @@
 DROP TABLE IF EXISTS courses;
 
 CREATE TABLE courses (
-    id INT PRIMARY KEY AUTO_INCREMENT,
+    id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     description TEXT,
     created_at TIMESTAMP
@@ -10,7 +10,7 @@ CREATE TABLE courses (
 DROP TABLE IF EXISTS cars;
 
 CREATE TABLE cars (
-    id INT PRIMARY KEY AUTO_INCREMENT,
+    id SERIAL PRIMARY KEY,
     make VARCHAR(255) NOT NULL,
     model VARCHAR(255) NOT NULL,
     created_at TIMESTAMP
