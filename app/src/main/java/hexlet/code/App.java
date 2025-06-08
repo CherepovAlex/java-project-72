@@ -40,11 +40,13 @@ import lombok.extern.slf4j.Slf4j;
 public class App {
 
     private static int getPort() {
+        // Получаем порт из переменных окружения или используем 7070 по умолчанию
         String port = System.getenv().getOrDefault("PORT", "7070");
         return Integer.valueOf(port);
     }
 
     private static String readResourceFile(String fileName) throws IOException {
+        // Чтение файлов ресурсов (например, SQL-скриптов)
         var inputStream = App.class.getClassLoader().getResourceAsStream(fileName);
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
             return reader.lines().collect(Collectors.joining("\n"));
@@ -54,39 +56,36 @@ public class App {
     public static Javalin getApp() throws IOException, SQLException {
 
         var hikariConfig = new HikariConfig();
-
+        // Получаем URL БД из переменных окружения
         String jdbcUrl = System.getenv("JDBC_DATABASE_URL");
-        String dbUser = System.getenv("DB_USER");
-        String dbPassword = System.getenv("DB_PASSWORD");
 
         if (jdbcUrl == null || jdbcUrl.isEmpty()) {
-            // Режим разработки (H2)
+        // Режим разработки (H2 в памяти)
             hikariConfig.setJdbcUrl("jdbc:h2:mem:project;DB_CLOSE_DELAY=-1;");
             hikariConfig.setDriverClassName("org.h2.Driver");
         } else {
-            // Продакшен (PostgreSQL)
+        // Продакшен (PostgreSQL)
             hikariConfig.setJdbcUrl(jdbcUrl);
-            hikariConfig.setUsername(dbUser != null ? dbUser : "alexander");
-            hikariConfig.setPassword(dbPassword != null ? dbPassword : "OqBr2SjY2ViDUuYXxvucihu6EmEioIlL");
             hikariConfig.setDriverClassName("org.postgresql.Driver");
-
+        // Оптимальные настройки для Render.com
             hikariConfig.setMaximumPoolSize(5);
             hikariConfig.setMinimumIdle(2);
             hikariConfig.setIdleTimeout(30000);
         }
 
         var dataSource = new HikariDataSource(hikariConfig);
-
-// Инициализация БД
+        // Инициализация БД
         try {
             if (jdbcUrl != null && !jdbcUrl.contains("h2")) {
+                // Для PostgreSQL используем Flyway миграции
                 Flyway flyway = Flyway.configure()
                         .dataSource(dataSource)
                         .baselineOnMigrate(true)
                         .load();
                 flyway.migrate();
             } else {
-                var sql = readResourceFile("schema.sql");
+                // Инициализация схемы для H2 напрямую
+                var sql = readResourceFile("templates/schema.sql");
                 try (var connection = dataSource.getConnection();
                      var statement = connection.createStatement()) {
                     statement.execute(sql);
@@ -98,6 +97,7 @@ public class App {
 
         BaseRepository.dataSource = dataSource;
 
+        // Создаем Javalin приложение
         var app = Javalin.create(config -> {
             config.bundledPlugins.enableDevLogging();
             config.fileRenderer(new JavalinJte());
