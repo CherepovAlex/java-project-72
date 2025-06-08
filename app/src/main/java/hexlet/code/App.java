@@ -82,6 +82,7 @@ public class App {
                         .dataSource(dataSource)
                         .baselineOnMigrate(true)
                         .load();
+                flyway.repair();
                 flyway.migrate();
             } else {
                 // Инициализация схемы для H2 напрямую
