@@ -7,8 +7,9 @@ plugins {
     id("application")
     id("io.freefair.lombok") version "8.13.1"
     id("com.github.ben-manes.versions") version "0.52.0"
-    id("com.github.johnrengelman.shadow") version "8.1.1"
     id("org.sonarqube") version "6.2.0.5505"
+    id("gg.jte.gradle") version "3.0.0"
+    id("com.github.johnrengelman.shadow") version "8.1.1"
 }
 
 group = "hexlet.code"
@@ -17,6 +18,11 @@ version = "1.0-SNAPSHOT"
 application {
     mainClass.set("hexlet.code.App")
 }
+
+jte {
+    generate()
+}
+
 
 repositories {
     mavenCentral()
