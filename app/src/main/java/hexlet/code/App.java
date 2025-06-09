@@ -15,11 +15,6 @@ import org.flywaydb.core.Flyway;
 import lombok.extern.slf4j.Slf4j;
 
 import io.javalin.Javalin;
-//import io.javalin.rendering.template.JavalinThymeleaf;
-//import nz.net.ultraq.thymeleaf.layoutdialect.LayoutDialect;
-//import org.thymeleaf.TemplateEngine;
-//import org.thymeleaf.extras.java8time.dialect.Java8TimeDialect;
-//import org.thymeleaf.templateresolver.ClassLoaderTemplateResolver;
 import gg.jte.ContentType;
 import gg.jte.TemplateEngine;
 import io.javalin.rendering.template.JavalinJte;
