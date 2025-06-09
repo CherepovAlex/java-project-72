@@ -5,39 +5,24 @@ import java.io.IOException;
 import java.sql.SQLException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
-//import java.util.List;
 import java.util.stream.Collectors;
 
-//import io.javalin.rendering.template.JavalinJte;
-//import static io.javalin.rendering.template.TemplateUtil.model;
-
-//import hexlet.code.controller.CarsController;
-//import hexlet.code.controller.PostsController;
-//import hexlet.code.controller.SessionsController;
-//import hexlet.code.controller.UsersController;
-//import hexlet.code.dto.MainPage;
-//import hexlet.code.dto.courses.CoursesPage;
-//import hexlet.code.dto.courses.CoursePage;
-//import hexlet.code.dto.users.BuildUserPage;
-//import hexlet.code.dto.users.UsersPage;
-//import hexlet.code.model.Course;
-//import hexlet.code.model.User;
 import hexlet.code.repository.BaseRepository;
-//import hexlet.code.repository.CourseRepository;
-//import hexlet.code.repository.UserRepository;
-//import hexlet.code.util.NamedRoutes;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import org.flywaydb.core.Flyway;
 
-import io.javalin.Javalin;
-//import io.javalin.validation.ValidationException;
-//import io.javalin.http.NotFoundResponse;
-import io.javalin.rendering.template.JavalinJte;
 import lombok.extern.slf4j.Slf4j;
-// импорт необходимых классов для работы с шаблонизатором
+
+import io.javalin.Javalin;
+//import io.javalin.rendering.template.JavalinThymeleaf;
+//import nz.net.ultraq.thymeleaf.layoutdialect.LayoutDialect;
+//import org.thymeleaf.TemplateEngine;
+//import org.thymeleaf.extras.java8time.dialect.Java8TimeDialect;
+//import org.thymeleaf.templateresolver.ClassLoaderTemplateResolver;
 import gg.jte.ContentType;
 import gg.jte.TemplateEngine;
+import io.javalin.rendering.template.JavalinJte;
 import gg.jte.resolve.ResourceCodeResolver;
 
 @Slf4j
@@ -56,13 +41,11 @@ public class App {
             return reader.lines().collect(Collectors.joining("\n"));
         }
     }
+
     // метод создаёт и настраивает движок шаблонов
     private static TemplateEngine createTemplateEngine() {
-        // получаем объект Class и classLoader для загрузки ресурсов приложения
         ClassLoader classLoader = App.class.getClassLoader();
-        // объект будет искать шаблоны в ресурсах приложения:путь(src/main/resources/templates/) и сам загрузчик
         ResourceCodeResolver codeResolver = new ResourceCodeResolver("templates", classLoader);
-        // создаёт движок, в котором поисковик и указан формат Html
         TemplateEngine templateEngine = TemplateEngine.create(codeResolver, ContentType.Html);
         return templateEngine;
     }
@@ -74,14 +57,14 @@ public class App {
         String jdbcUrl = System.getenv("JDBC_DATABASE_URL");
 
         if (jdbcUrl == null || jdbcUrl.isEmpty()) {
-        // Режим разработки (H2 в памяти)
+            // Режим разработки (H2 в памяти)
             hikariConfig.setJdbcUrl("jdbc:h2:mem:project;DB_CLOSE_DELAY=-1;");
             hikariConfig.setDriverClassName("org.h2.Driver");
         } else {
-        // Продакшен (PostgreSQL)
+            // Продакшен (PostgreSQL)
             hikariConfig.setJdbcUrl(jdbcUrl);
             hikariConfig.setDriverClassName("org.postgresql.Driver");
-        // Оптимальные настройки для Render.com
+            // Оптимальные настройки для Render.com
             hikariConfig.setMaximumPoolSize(5);
             hikariConfig.setMinimumIdle(2);
             hikariConfig.setIdleTimeout(30000);
@@ -118,7 +101,7 @@ public class App {
             // конфигурация Javalin изменена, чтобы использовать созданный движок шаблонов
             config.fileRenderer(new JavalinJte(createTemplateEngine()));
         });
-        app.get("/", ctx -> ctx.result("Hello World with PostgreSQL!"));
+        app.get("/", ctx -> ctx.render("index.jte"));
 
         app.get("/health", ctx -> {
             try (var conn = BaseRepository.dataSource.getConnection()) {
