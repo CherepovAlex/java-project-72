@@ -35,6 +35,10 @@ import io.javalin.Javalin;
 //import io.javalin.http.NotFoundResponse;
 import io.javalin.rendering.template.JavalinJte;
 import lombok.extern.slf4j.Slf4j;
+// импорт необходимых классов для работы с шаблонизатором
+import gg.jte.ContentType;
+import gg.jte.TemplateEngine;
+import gg.jte.resolve.ResourceCodeResolver;
 
 @Slf4j
 public class App {
@@ -51,6 +55,16 @@ public class App {
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
             return reader.lines().collect(Collectors.joining("\n"));
         }
+    }
+    // метод создаёт и настраивает движок шаблонов
+    private static TemplateEngine createTemplateEngine() {
+        // получаем объект Class и classLoader для загрузки ресурсов приложения
+        ClassLoader classLoader = App.class.getClassLoader();
+        // объект будет искать шаблоны в ресурсах приложения:путь(src/main/resources/templates/) и сам загрузчик
+        ResourceCodeResolver codeResolver = new ResourceCodeResolver("templates", classLoader);
+        // создаёт движок, в котором поисковик и указан формат Html
+        TemplateEngine templateEngine = TemplateEngine.create(codeResolver, ContentType.Html);
+        return templateEngine;
     }
 
     public static Javalin getApp() throws IOException, SQLException {
@@ -86,7 +100,7 @@ public class App {
                 flyway.migrate();
             } else {
                 // Инициализация схемы для H2 напрямую
-                var sql = readResourceFile("templates/schema.sql");
+                var sql = readResourceFile("schema.sql");
                 try (var connection = dataSource.getConnection();
                      var statement = connection.createStatement()) {
                     statement.execute(sql);
@@ -101,7 +115,8 @@ public class App {
         // Создаем Javalin приложение
         var app = Javalin.create(config -> {
             config.bundledPlugins.enableDevLogging();
-            config.fileRenderer(new JavalinJte());
+            // конфигурация Javalin изменена, чтобы использовать созданный движок шаблонов
+            config.fileRenderer(new JavalinJte(createTemplateEngine()));
         });
         app.get("/", ctx -> ctx.result("Hello World with PostgreSQL!"));
 
