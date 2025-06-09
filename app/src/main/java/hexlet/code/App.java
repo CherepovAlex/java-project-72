@@ -39,8 +39,15 @@ public class App {
 
     // метод создаёт и настраивает движок шаблонов
     private static TemplateEngine createTemplateEngine() {
+        // Получает загрузчик классов для текущего класса App
         ClassLoader classLoader = App.class.getClassLoader();
+        // 2. Создает резолвер шаблонов:
+        //    - Ищет файлы шаблонов в директории "templates" classpath
+        //    - Использует полученный загрузчик классов
         ResourceCodeResolver codeResolver = new ResourceCodeResolver("templates", classLoader);
+        // 3. Инициализирует движок шаблонов:
+        //    - Передает резолвер для поиска шаблонов
+        //    - Указывает тип контента HTML (рендеринг как HTML)
         TemplateEngine templateEngine = TemplateEngine.create(codeResolver, ContentType.Html);
         return templateEngine;
     }
