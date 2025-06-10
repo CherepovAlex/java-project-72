@@ -2,14 +2,19 @@ package hexlet.code;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.net.URI;
 import java.sql.SQLException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.stream.Collectors;
 
+import hexlet.code.model.Url;
 import hexlet.code.repository.BaseRepository;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
+import hexlet.code.repository.UrlRepository;
 import org.flywaydb.core.Flyway;
 
 import lombok.extern.slf4j.Slf4j;
@@ -23,7 +28,7 @@ import gg.jte.resolve.ResourceCodeResolver;
 @Slf4j
 public class App {
 
-    private static int getPort() {
+    private static int getPort() throws IOException, SQLException {
         // Получаем порт из переменных окружения или используем 7070 по умолчанию
         String port = System.getenv().getOrDefault("PORT", "7070");
         return Integer.valueOf(port);
@@ -102,8 +107,72 @@ public class App {
             config.bundledPlugins.enableDevLogging();
             // конфигурация Javalin изменена, чтобы использовать созданный движок шаблонов
             config.fileRenderer(new JavalinJte(createTemplateEngine()));
+            // включаем встроенные сессии в Javalin 6.x
+            config.useVirtualThreads = true;
         });
-        app.get("/", ctx -> ctx.render("index.jte"));
+        // Middleware для обработки flash-сообщений
+        app.before(ctx -> {
+            // Переносим flash-сообщения из сессии в атрибуты запроса
+            if (ctx.sessionAttribute("flash") != null) {
+                ctx.attribute("flash", ctx.sessionAttribute("flash"));
+                ctx.sessionAttribute("flash", null);
+            }
+            if (ctx.sessionAttribute("flash-type") != null) {
+                ctx.attribute("flash-type", ctx.sessionAttribute("flash-type"));
+                ctx.sessionAttribute("flash-type", null);
+            }
+        });
+        // Главная страница с формой ввода URL
+        app.get("/", ctx -> {
+            Map<String, Object> model = new HashMap<>();
+            model.put("flash", ctx.attribute("flash"));
+            model.put("flashType", ctx.attribute("flash-type"));
+            ctx.render("index.jte", model);
+        });
+        // Обработчик формы - добавляет URL в базу данных
+        app.post("/urls", ctx -> {
+            var inputUrl = ctx.formParam("url");
+            try {
+                // нормализуем url: оставляем только протокол, домен и порт
+                var uri = new URI(inputUrl).toURL();
+                var nomalizedUrl = uri.getProtocol() + "://" + uri.getAuthority();
+                // проверяем есть ли дубль
+                var existingUrl = UrlRepository.findByName(nomalizedUrl);
+                if (existingUrl.isPresent()) {
+                    // если есть - выводим flash-message
+                    ctx.sessionAttribute("flash", "The page already exists");
+                    ctx.sessionAttribute("flash-type", "info");
+                } else {
+                    // добавляем новый url в БД
+                    var url = new Url(nomalizedUrl);
+                    UrlRepository.save(url);
+                    ctx.sessionAttribute("flash", "The page added successfully");
+                    ctx.sessionAttribute("flash-type", "success");
+                }
+            } catch (Exception e) {
+                // если url некорректный, то выводим сообщение
+                ctx.sessionAttribute("flash", "Incorrect URL");
+                ctx.sessionAttribute("flash-type", "danger");
+            }
+            ctx.redirect("/");
+        });
+
+        // страница со списком всех url
+        app.get("/urls", ctx -> {
+            var urls = UrlRepository.getEntities();
+            ctx.render("urls/index.jte", Map.of("urls", urls));
+        });
+
+        app.get("/urls/{id}", ctx -> {
+            var id = ctx.pathParamAsClass("id", Long.class).get();
+            var url = UrlRepository.find(id);
+            if (url.isEmpty()) {
+                // если такой страницы нет, то ошибка 404
+                ctx.status(404);
+                return;
+            }
+            ctx.render("urls/show.jte", Map.of("url", url.get()));
+        });
 
         app.get("/health", ctx -> {
             try (var conn = BaseRepository.dataSource.getConnection()) {
