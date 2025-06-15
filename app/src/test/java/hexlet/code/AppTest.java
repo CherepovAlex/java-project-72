@@ -1,0 +1,226 @@
+package hexlet.code;
+
+import hexlet.code.model.Url;
+import hexlet.code.repository.UrlCheckRepository;
+import hexlet.code.repository.UrlRepository;
+
+import io.javalin.Javalin;
+import io.javalin.testtools.JavalinTest;
+import jakarta.servlet.http.HttpServletResponse;
+
+import kong.unirest.HttpResponse;
+import kong.unirest.Unirest;
+import kong.unirest.UnirestException;
+import kong.unirest.HttpRequest;
+
+import okhttp3.mockwebserver.MockResponse;
+import okhttp3.mockwebserver.MockWebServer;
+
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+
+import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.time.format.DateTimeFormatter;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+public final class AppTest {
+
+    private static MockWebServer mockServer;
+    private static Javalin app;
+    private static String baseUrl;
+    private static final String CORRECT_URL = "https://www.google.com";
+    private static final String URL_FOR_NON_EXISTING_ENTITY_TEST = "https://www.dzen.ru";
+    private static final String WRONG_URL = "htp:/invalid.url";
+
+    private static Path getFixturePath(String fileName) {
+        return Paths.get("src", "test", "resources", "fixtures", fileName)
+                .toAbsolutePath().normalize();
+    }
+
+    private static String readFixture(String fileName) throws IOException {
+        Path filePath = getFixturePath(fileName);
+        return Files.readString(filePath).trim();
+    }
+
+    @BeforeAll
+    public static void beforeAll() throws SQLException, IOException {
+        app = App.getApp();
+        app.start(0);
+        int port = app.port();
+        baseUrl = "http://localhost:" + port;
+
+        mockServer = new MockWebServer();
+        MockResponse mockedResponse = new MockResponse()
+                .setBody(readFixture("index.html"));
+        mockServer.enqueue(mockedResponse);
+        mockServer.start();
+    }
+
+    @AfterAll
+    public static void afterAll() throws IOException {
+        app.stop();
+        mockServer.shutdown();
+        Unirest.shutDown(); // Закрываем все соединения Unirest
+    }
+
+    @BeforeEach
+    public void beforeEach() throws SQLException {
+        UrlRepository.truncateDB();
+        UrlCheckRepository.truncateDB();
+
+        Url firstUrl = new Url(CORRECT_URL);
+        firstUrl.setCreatedAt(new Timestamp(System.currentTimeMillis()));
+        UrlRepository.save(firstUrl);
+    }
+
+    @Test
+    public void testInit() {
+        assertThat(true).isEqualTo(true);
+    }
+
+    @Test
+    public void testWelcome() {
+        // Для GET-запросов с простым телом закрывать ничего не нужно
+        HttpResponse<String> response = Unirest.get(baseUrl).asString();
+        assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_OK);
+    }
+
+    @Nested
+    class UrlControllerTest {
+        @Test
+        public void testCreateUrl() {
+            HttpRequest request = Unirest.post(baseUrl + "/urls")
+                    .field("url", CORRECT_URL);
+
+            try {
+                HttpResponse<String> response = request.asString();
+                assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_FOUND);
+
+                // Проверяем, что URL появился в списке
+                HttpResponse<String> urlsResponse = Unirest.get(baseUrl + "/urls").asString();
+                assertThat(urlsResponse.getBody()).contains(CORRECT_URL);
+            } catch (UnirestException e) {
+                throw new RuntimeException("Request failed", e);
+            }
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = {"htp:/invalid.url", "not-a-url", "http://"})
+        public void testCreateWrongUrl(String url) {
+            // Убираем приведение типа и работаем напрямую с HttpRequest
+            HttpRequest request = Unirest.post(baseUrl + "/urls")
+                    .field("url", url);
+
+            try {
+                HttpResponse<String> response = request.asString();
+                assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_FOUND);
+
+                // Проверяем flash-сообщение
+                HttpResponse<String> getResponse = Unirest.get(baseUrl).asString();
+                assertThat(getResponse.getBody()).contains("Некорректный URL");
+
+                // Проверяем, что URL не добавился в список
+                HttpResponse<String> urlsResponse = Unirest.get(baseUrl + "/urls").asString();
+                assertThat(urlsResponse.getBody()).doesNotContain(url);
+            } catch (UnirestException e) {
+                throw new RuntimeException("Request failed", e);
+            }
+        }
+
+        @Test
+        public void testShowUrls() {
+            HttpResponse<String> response = Unirest.get(baseUrl + "/urls").asString();
+            String body = response.getBody();
+            int getQueryStatus = response.getStatus();
+
+            assertThat(getQueryStatus).isEqualTo(HttpServletResponse.SC_OK);
+            assertThat(body).contains(CORRECT_URL);
+        }
+
+        @Test
+        public void testShowUrlById() throws SQLException {
+            Url actualUrl = UrlRepository.findByName(CORRECT_URL).orElseThrow(
+                    () -> new SQLException("url with the name " + CORRECT_URL + " was not found!"));
+
+            Long id = actualUrl.getId();
+
+            HttpResponse<String> response = Unirest.get(baseUrl + "/urls/" + id).asString();
+            String body = response.getBody();
+
+            assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_OK);
+            assertThat(body).contains(CORRECT_URL,
+                    actualUrl.getCreatedAt()
+                            .toLocalDateTime()
+                            .format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")));
+
+            Url wrongUrl = new Url(URL_FOR_NON_EXISTING_ENTITY_TEST);
+            wrongUrl.setCreatedAt(new Timestamp(System.currentTimeMillis()));
+            UrlRepository.save(wrongUrl);
+            Long idForDeletion = UrlRepository.findByName(URL_FOR_NON_EXISTING_ENTITY_TEST)
+                    .orElseThrow(() -> new SQLException("wrongUrl with name " + URL_FOR_NON_EXISTING_ENTITY_TEST
+                            + " was not found in DB!"))
+                    .getId();
+
+            UrlRepository.delete(idForDeletion);
+            response = Unirest.get(baseUrl + "/urls/" + idForDeletion).asString();
+            assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_NOT_FOUND);
+        }
+    }
+
+    @Nested
+    class UrlCheckControllerTest {
+
+        @Test
+        public void addUrlCheckTest() throws SQLException, IOException {
+            Javalin additionalApp = App.getApp();
+
+            String url = mockServer.url("/").toString().replaceAll("/$", "");
+
+            JavalinTest.test(additionalApp, (server, client) -> {
+                // 1. Добавляем URL
+                String requestBody = "url=" + url;
+                var postResponse = client.post("/urls", requestBody);
+                assertThat(postResponse.code()).isEqualTo(HttpServletResponse.SC_OK);
+                // 2. Получаем добавленный URL
+                Url actualUrl = UrlRepository.findByName(url).orElse(null);
+                assertThat(actualUrl)
+                        .as("URL должен быть сохранен в базе")
+                        .isNotNull();
+                // 3. Выполняем проверку URL (изменяем ожидаемый статус на 200)
+                var checkResponse = client.post("/urls/" + actualUrl.getId() + "/checks");
+                assertThat(checkResponse.code()).isEqualTo(HttpServletResponse.SC_OK);
+
+                // 4. Проверяем, что проверка сохранилась
+                var actualCheck = UrlCheckRepository.findLastCheckByUrlId(actualUrl.getId())
+                        .orElse(null);
+                assertThat(actualCheck)
+                        .as("Проверка должна быть сохранена")
+                        .isNotNull();
+
+                assertThat(actualCheck.getTitle())
+                        .as("Заголовок страницы должен соответствовать фикстуре")
+                        .isEqualTo("Test page");
+
+                assertThat(actualCheck.getH1())
+                        .as("H1 должен соответствовать фикстуре")
+                        .isEqualTo("Test page.");
+
+                assertThat(actualCheck.getDescription())
+                        .as("Описание должно соответствовать фикстуре")
+                        .isEqualTo("statements of great people");
+            });
+        }
+    }
+}

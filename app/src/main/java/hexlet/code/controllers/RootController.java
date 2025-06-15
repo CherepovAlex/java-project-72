@@ -7,5 +7,4 @@ public class RootController {
     public static Handler welcome = ctx -> {
         ctx.render("index.html");
     };
-
 }

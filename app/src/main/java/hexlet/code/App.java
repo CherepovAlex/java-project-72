@@ -1,192 +1,147 @@
 package hexlet.code;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.net.URI;
-import java.sql.SQLException;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.stream.Collectors;
-
-import hexlet.code.model.Url;
-import hexlet.code.repository.BaseRepository;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
-import hexlet.code.repository.UrlRepository;
-import org.flywaydb.core.Flyway;
-
-import lombok.extern.slf4j.Slf4j;
-
+import hexlet.code.controllers.RootController;
+import hexlet.code.controllers.UrlController;
+import hexlet.code.controllers.UrlCheckController;
+import hexlet.code.repository.BaseRepository;
 import io.javalin.Javalin;
-import gg.jte.ContentType;
-import gg.jte.TemplateEngine;
-import io.javalin.rendering.template.JavalinJte;
-import gg.jte.resolve.ResourceCodeResolver;
+import io.javalin.rendering.template.JavalinThymeleaf;
+import lombok.extern.slf4j.Slf4j;
+import nz.net.ultraq.thymeleaf.layoutdialect.LayoutDialect;
+import org.thymeleaf.TemplateEngine;
+import org.thymeleaf.extras.java8time.dialect.Java8TimeDialect;
+import org.thymeleaf.templateresolver.ClassLoaderTemplateResolver;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.stream.Collectors;
 
 @Slf4j
 public class App {
 
-    private static int getPort() throws IOException, SQLException {
-        // Получаем порт из переменных окружения или используем 7070 по умолчанию
-        String port = System.getenv().getOrDefault("PORT", "7070");
-        return Integer.valueOf(port);
+    private static final String DEFAULT_PORT = "8081";
+    private static final String DEFAULT_MODE = "production";
+    private static final String ADDITIONAL_MODE = "development";
+
+    public static void main(String[] args) throws SQLException, IOException {
+        Javalin app = getApp();
+        app.start(getPort());
     }
 
-    private static String readResourceFile(String fileName) throws IOException {
-        // Чтение файлов ресурсов (например, SQL-скриптов)
-        var inputStream = App.class.getClassLoader().getResourceAsStream(fileName);
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
-            return reader.lines().collect(Collectors.joining("\n"));
-        }
-    }
-
-    // метод создаёт и настраивает движок шаблонов
-    private static TemplateEngine createTemplateEngine() {
-        // Получает загрузчик классов для текущего класса App
-        ClassLoader classLoader = App.class.getClassLoader();
-        // 2. Создает резолвер шаблонов:
-        //    - Ищет файлы шаблонов в директории "templates" classpath
-        //    - Использует полученный загрузчик классов
-        ResourceCodeResolver codeResolver = new ResourceCodeResolver("templates", classLoader);
-        // 3. Инициализирует движок шаблонов:
-        //    - Передает резолвер для поиска шаблонов
-        //    - Указывает тип контента HTML (рендеринг как HTML)
-        TemplateEngine templateEngine = TemplateEngine.create(codeResolver, ContentType.Html);
-        return templateEngine;
+    private static boolean isProduction() {
+        return getMode().equals(DEFAULT_MODE);
     }
 
     public static Javalin getApp() throws IOException, SQLException {
 
-        var hikariConfig = new HikariConfig();
-        // Получаем URL БД из переменных окружения
-        String jdbcUrl = System.getenv("JDBC_DATABASE_URL");
+        HikariConfig hikariConfig = new HikariConfig();
+        hikariConfig.setJdbcUrl(getDatabaseUrl());
 
-        if (jdbcUrl == null || jdbcUrl.isEmpty()) {
-            // Режим разработки (H2 в памяти)
-            hikariConfig.setJdbcUrl("jdbc:h2:mem:project;DB_CLOSE_DELAY=-1;");
-            hikariConfig.setDriverClassName("org.h2.Driver");
-        } else {
-            // Продакшен (PostgreSQL)
-            hikariConfig.setJdbcUrl(jdbcUrl);
-            hikariConfig.setDriverClassName("org.postgresql.Driver");
-            // Оптимальные настройки для Render.com
-            hikariConfig.setMaximumPoolSize(5);
-            hikariConfig.setMinimumIdle(2);
-            hikariConfig.setIdleTimeout(30000);
-        }
+        HikariDataSource hikariDataSource = new HikariDataSource(hikariConfig);
+        var url = App.class.getClassLoader().getResource("schema.sql");
 
-        var dataSource = new HikariDataSource(hikariConfig);
-        // Инициализация БД
+        File file;
+        String sql;
+
         try {
-            if (jdbcUrl != null && !jdbcUrl.contains("h2")) {
-                // Для PostgreSQL используем Flyway миграции
-                Flyway flyway = Flyway.configure()
-                        .dataSource(dataSource)
-                        .baselineOnMigrate(true)
-                        .load();
-                flyway.repair();
-                flyway.migrate();
-            } else {
-                // Инициализация схемы для H2 напрямую
-                var sql = readResourceFile("schema.sql");
-                try (var connection = dataSource.getConnection();
-                     var statement = connection.createStatement()) {
-                    statement.execute(sql);
-                }
-            }
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to initialize database", e);
+            file = new File(url.getFile());
+            sql = Files.lines(file.toPath())
+                    .collect(Collectors.joining("\n"));
+        } catch (NoSuchFileException e) {
+            sql = """
+                    DROP TABLE IF EXISTS urls;
+                    create table urls
+                    (
+                        id         bigint generated by default as identity not null,
+                        name       varchar(255),
+                        created_at timestamp                               not null
+                    );
+                    DROP TABLE IF EXISTS url_checks;
+                    create table url_checks
+                    (
+                        id          bigint generated by default as identity not null,
+                        status_code integer                                 not null,
+                        title       varchar(255),
+                        h1          varchar(255),
+                        description text,
+                        created_at  timestamp                               not null,
+                        url_id      bigint                                  not null
+                    );
+                    """;
         }
 
-        BaseRepository.dataSource = dataSource;
+        try (Connection connection = hikariDataSource.getConnection();
+             Statement statement = connection.createStatement()) {
+            statement.execute(sql);
+        }
 
-        // Создаем Javalin приложение
-        var app = Javalin.create(config -> {
-            config.bundledPlugins.enableDevLogging();
-            // конфигурация Javalin изменена, чтобы использовать созданный движок шаблонов
-            config.fileRenderer(new JavalinJte(createTemplateEngine()));
-            // включаем встроенные сессии в Javalin 6.x
-            config.useVirtualThreads = true;
+        BaseRepository.dataSource = hikariDataSource;
+
+        Javalin app = Javalin.create(config -> {
+            if (!isProduction()) {
+                config.bundledPlugins.enableDevLogging();
+            }
+            config.fileRenderer(new JavalinThymeleaf(getTemplateEngine()));
         });
-        // Middleware для обработки flash-сообщений
+        app.exception(Exception.class, (e, ctx) -> {
+            log.error("Unhandled exception", e);
+            ctx.status(500);
+            ctx.result("Internal server error");
+        });
+
+        app.error(404, ctx -> {
+            ctx.status(404);
+            ctx.result("Not found");
+        });
+        addRoutes(app);
         app.before(ctx -> {
-            // Переносим flash-сообщения из сессии в атрибуты запроса
-            if (ctx.sessionAttribute("flash") != null) {
-                ctx.attribute("flash", ctx.sessionAttribute("flash"));
-                ctx.sessionAttribute("flash", null);
-            }
-            if (ctx.sessionAttribute("flash-type") != null) {
-                ctx.attribute("flash-type", ctx.sessionAttribute("flash-type"));
-                ctx.sessionAttribute("flash-type", null);
-            }
-        });
-        // Главная страница с формой ввода URL
-        app.get("/", ctx -> {
-            Map<String, Object> model = new HashMap<>();
-            model.put("flash", ctx.attribute("flash"));
-            model.put("flashType", ctx.attribute("flash-type"));
-            ctx.render("index.jte", model);
-        });
-        // Обработчик формы - добавляет URL в базу данных
-        app.post("/urls", ctx -> {
-            var inputUrl = ctx.formParam("url");
-            try {
-                // нормализуем url: оставляем только протокол, домен и порт
-                var uri = new URI(inputUrl).toURL();
-                var nomalizedUrl = uri.getProtocol() + "://" + uri.getAuthority();
-                // проверяем есть ли дубль
-                var existingUrl = UrlRepository.findByName(nomalizedUrl);
-                if (existingUrl.isPresent()) {
-                    // если есть - выводим flash-message
-                    ctx.sessionAttribute("flash", "The page already exists");
-                    ctx.sessionAttribute("flash-type", "info");
-                } else {
-                    // добавляем новый url в БД
-                    var url = new Url(nomalizedUrl);
-                    UrlRepository.save(url);
-                    ctx.sessionAttribute("flash", "The page added successfully");
-                    ctx.sessionAttribute("flash-type", "success");
-                }
-            } catch (Exception e) {
-                // если url некорректный, то выводим сообщение
-                ctx.sessionAttribute("flash", "Incorrect URL");
-                ctx.sessionAttribute("flash-type", "danger");
-            }
-            ctx.redirect("/");
-        });
-
-        // страница со списком всех url
-        app.get("/urls", ctx -> {
-            var urls = UrlRepository.getEntities();
-            ctx.render("urls/index.jte", Map.of("urls", urls));
-        });
-
-        app.get("/urls/{id}", ctx -> {
-            var id = ctx.pathParamAsClass("id", Long.class).get();
-            var url = UrlRepository.find(id);
-            if (url.isEmpty()) {
-                // если такой страницы нет, то ошибка 404
-                ctx.status(404);
-                return;
-            }
-            ctx.render("urls/show.jte", Map.of("url", url.get()));
-        });
-
-        app.get("/health", ctx -> {
-            try (var conn = BaseRepository.dataSource.getConnection()) {
-                ctx.result("Database connection OK");
-            } catch (SQLException e) {
-                ctx.status(500).result("DB connection error: " + e.getMessage());
-            }
+            ctx.attribute("ctx", ctx);
         });
 
         return app;
     }
 
-    public static void main(String[] args) throws IOException, SQLException {
-        Javalin app = getApp();
-        app.start(getPort());
+    private static void addRoutes(Javalin app) {
+        app.get("/", RootController.welcome);
+        app.get("/urls", UrlController.showUrls);
+        app.post("/urls", UrlController.createUrl);
+        app.get("/urls/{id}", UrlController.showUrlById);
+        app.post("/urls/{id}/checks", UrlCheckController.addCheck);
+    }
+
+    private static String getMode() {
+        return System.getenv()
+                .getOrDefault("APP_ENV", ADDITIONAL_MODE);
+    }
+
+    private static int getPort() {
+        String port = System.getenv().getOrDefault("PORT", DEFAULT_PORT);
+        return Integer.valueOf(port);
+    }
+    private static String getDatabaseUrl() {
+        return System.getenv()
+                .getOrDefault("JDBC_DATABASE_URL", "jdbc:h2:mem:project");
+    }
+
+    private static TemplateEngine getTemplateEngine() {
+
+        TemplateEngine templateEngine = new TemplateEngine();
+
+        ClassLoaderTemplateResolver templateResolver = new ClassLoaderTemplateResolver();
+        templateResolver.setPrefix("/templates/");
+        templateResolver.setSuffix(".html");
+        templateResolver.setCharacterEncoding("UTF-8");
+
+        templateEngine.addTemplateResolver(templateResolver);
+        templateEngine.addDialect(new LayoutDialect());
+        templateEngine.addDialect(new Java8TimeDialect());
+
+        return templateEngine;
     }
 }
