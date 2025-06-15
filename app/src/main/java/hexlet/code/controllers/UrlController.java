@@ -11,7 +11,6 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.net.MalformedURLException;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.net.URL;
 import java.sql.SQLException;
 import java.util.HashMap;
@@ -34,22 +33,21 @@ public class UrlController {
             return;
         }
         try {
-            // Добавляем протокол только если URL не начинается с http:// или https://
-            // и если это вообще похоже на URL
-            if (!inputUrl.matches("^https?://.*") && inputUrl.matches("^[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}.*")) {
-                inputUrl = "http://" + inputUrl;
+            // Проверяем, что URL начинается с протокола
+            if (!inputUrl.matches("^https?://.+")) {
+                throw new MalformedURLException("URL должен начинаться с http:// или https://");
             }
 
             // Парсим и нормализуем URL
             URI uri = new URI(inputUrl).normalize();
             URL url = uri.toURL();
 
-            // Дополнительная валидация
-            if (url.getHost() == null || url.getHost().isEmpty()) {
-                throw new URISyntaxException(inputUrl, "Invalid host");
+            // Проверяем обязательные компоненты URL
+            if (url.getProtocol() == null || url.getHost() == null || url.getHost().isEmpty()) {
+                throw new MalformedURLException("Невалидный URL");
             }
 
-            // Получаем нормализованный URL (протокол + домен + порт)
+            // Собираем нормализованный URL (протокол + домен + порт)
             String normalizedUrl = normalizeUrl(url);
             log.debug("Normalized URL: {}", normalizedUrl);
 
@@ -67,13 +65,9 @@ public class UrlController {
 
             ctx.redirect("/urls");
 
-        } catch (URISyntaxException | IllegalArgumentException | MalformedURLException e) {
-            log.error("Invalid URL syntax: {}", inputUrl, e);
-            setFlashMessage(ctx, "Некорректный URL", "danger");
-            ctx.redirect("/");
         } catch (Exception e) {
-            log.error("Error processing URL: {}", e.getMessage(), e);
-            setFlashMessage(ctx, "Ошибка при обработке URL", "danger");
+            log.error("Invalid URL: {}", inputUrl, e);
+            setFlashMessage(ctx, "Некорректный URL", "danger");
             ctx.redirect("/");
         }
     };
@@ -127,23 +121,22 @@ public class UrlController {
     private static String normalizeUrl(URL url) {
         StringBuilder result = new StringBuilder();
 
-        // Протокол
-        String protocol = url.getProtocol();
-        result.append(protocol).append("://");
+        // Протокол (http или https)
+        result.append(url.getProtocol()).append("://");
 
-        // Домен (приводим к нижнему регистру)
-        String host = url.getHost().toLowerCase();
-        result.append(host);
+        // Домен (в нижнем регистре)
+        result.append(url.getHost().toLowerCase());
 
         // Порт (если указан и не стандартный для протокола)
         int port = url.getPort();
         if (port != -1) {
-            boolean isDefaultPort = (protocol.equals("http") && port == 80)
-                    || (protocol.equals("https") && port == 443);
+            boolean isDefaultPort = (url.getProtocol().equals("http") && port == 80)
+                    || (url.getProtocol().equals("https") && port == 443);
             if (!isDefaultPort) {
                 result.append(":").append(port);
             }
         }
+
         return result.toString();
     }
 

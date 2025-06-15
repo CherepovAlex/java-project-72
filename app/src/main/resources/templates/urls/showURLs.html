@@ -22,7 +22,9 @@
                     <a th:href="@{/urls/{id}(id=${url.id})}"
                        th:text="${url.name}"></a>
                 </td>
-                <td th:text="${urlChecks.get(url.id) != null} ? ${#temporals.format(urlChecks.get(url.id).createdAt, 'dd/MM/yyyy HH:mm')} : 'Нет данных'"></td>
+                <td th:text="${urlChecks.get(url.id) != null} ?
+                     ${#temporals.format(urlChecks.get(url.id).createdAtToInstant, 'dd/MM/yyyy HH:mm')} :
+                     'Нет данных'"></td>
                 <td th:text="${urlChecks.get(url.id) != null} ? ${urlChecks.get(url.id).statusCode} : 'Нет данных'"></td>
             </tr>
             </tbody>

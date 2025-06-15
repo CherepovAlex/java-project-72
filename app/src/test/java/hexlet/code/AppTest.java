@@ -219,7 +219,7 @@ public final class AppTest {
 
                 assertThat(actualCheck.getDescription())
                         .as("Описание должно соответствовать фикстуре")
-                        .isEqualTo("statements of great people");
+                        .isEqualTo("all right");
             });
         }
     }
