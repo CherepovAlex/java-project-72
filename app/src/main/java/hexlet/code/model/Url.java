@@ -12,7 +12,7 @@ import java.time.Instant;
 public final class Url {
     private Long id;
     @ToString.Include
-    private String name;
+    private String name;    // Нормализованный URL
     private Timestamp createdAt;
 
     public Url(String name) {

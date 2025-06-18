@@ -2,13 +2,13 @@ import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.api.tasks.testing.logging.TestLogEvent
 
 plugins {
-    id("checkstyle")
-    id("jacoco")
-    id("application")
-    id("io.freefair.lombok") version "8.13.1"
-    id("com.github.ben-manes.versions") version "0.52.0"
-    id("org.sonarqube") version "6.2.0.5505"
-    id("com.github.johnrengelman.shadow") version "8.1.1"
+    id("checkstyle")    // Проверка стиля кода
+    id("jacoco")        // Покрытие кода тестами
+    id("application")   // Тип приложения
+    id("io.freefair.lombok") version "8.13.1"   // Генерация кода (геттеры/сеттеры)
+    id("com.github.ben-manes.versions") version "0.52.0"    // Проверка обновлений зависимостей
+    id("org.sonarqube") version "6.2.0.5505"    // Интеграция с SonarQube
+    id("com.github.johnrengelman.shadow") version "8.1.1"   // Создание fat-jar
 }
 
 group = "hexlet.code"
@@ -28,7 +28,7 @@ tasks.compileJava {
 }
 
 dependencies {
-    implementation("io.javalin:javalin:6.6.0")
+    implementation("io.javalin:javalin:6.6.0")  // Веб-фреймворк
     implementation("io.javalin:javalin-rendering:6.6.0")
     implementation("org.slf4j:slf4j-simple:2.0.9"){
         exclude(group = "ch.qos.logback")
@@ -38,7 +38,7 @@ dependencies {
     implementation("org.apache.commons:commons-text:1.13.1")
     implementation("com.fasterxml.jackson.core:jackson-databind:2.18.3")
 
-    implementation("org.thymeleaf:thymeleaf:3.1.3.RELEASE")
+    implementation("org.thymeleaf:thymeleaf:3.1.3.RELEASE") // Шаблонизатор
     implementation("nz.net.ultraq.thymeleaf:thymeleaf-layout-dialect:3.2.1")
     implementation("org.thymeleaf.extras:thymeleaf-extras-java8time:3.0.4.RELEASE")
     implementation("org.webjars:bootstrap:5.3.0")
@@ -47,16 +47,16 @@ dependencies {
     implementation("org.postgresql:postgresql:42.7.3")
 
     implementation("org.jsoup:jsoup:1.15.4")
-    implementation("com.zaxxer:HikariCP:5.0.1")
+    implementation("com.zaxxer:HikariCP:5.0.1") // Пул соединений БД
 
     implementation("org.glassfish.jaxb:jaxb-runtime:2.3.5")
     implementation("javax.activation:activation:1.1.1")
 
     implementation("org.apache.commons:commons-lang3:3.12.0")
-    implementation("org.flywaydb:flyway-core:9.22.3")
+    implementation("org.flywaydb:flyway-core:9.22.3")   // Миграции БД
 
     testImplementation(platform("org.junit:junit-bom:5.12.2"))
-    testImplementation("org.junit.jupiter:junit-jupiter")
+    testImplementation("org.junit.jupiter:junit-jupiter")   // Тестирование
     testImplementation("org.assertj:assertj-core:3.27.3")
     testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
     testImplementation("org.junit.jupiter:junit-jupiter-params:5.12.2")

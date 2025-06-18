@@ -12,10 +12,10 @@ import java.time.Instant;
 public final class UrlCheck {
 
     private Long id;
-    private int statusCode;
-    private String title;
-    private String h1;
-    private String description;
+    private int statusCode;     // HTTP-статус
+    private String title;       // Заголовок страницы
+    private String h1;          // Заголовок h1
+    private String description; // Мета-описание
     private Timestamp createdAt;
     private Long urlId;
 
