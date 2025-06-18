@@ -28,12 +28,12 @@ public final class UrlCheck {
         this.createdAt = new Timestamp(System.currentTimeMillis());
     }
 
-    public UrlCheck(int statusCode, String title, String h1, String description) {
-        this.statusCode = statusCode;
-        this.title = title;
-        this.h1 = h1;
-        this.description = description;
-    }
+//    public UrlCheck(int statusCode, String title, String h1, String description) {
+//        this.statusCode = statusCode;
+//        this.title = title;
+//        this.h1 = h1;
+//        this.description = description;
+//    }
 
     public Instant getCreatedAtToInstant() {
         return createdAt != null ? createdAt.toInstant() : null;
