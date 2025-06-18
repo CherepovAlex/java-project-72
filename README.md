@@ -17,15 +17,18 @@ Thymeleaf and other technologies for that purpose.
 * Java 21
 * Gradle > 8.5
 
-## Usage
-
-```bash
-make install
-make start
-```
-
 ### Link on project:
-[![Render Status](https://api.render.com/deploy/badge/srv-d11dpeu3jp1c73cae3kg?type=web)](https://java-project-72-3zgz.onrender.com)
 [![Render.com](https://render.com/images/render-banner.png)](https://java-project-72-3zgz.onrender.com/)
 
-Open in browser: http://localhost:7070
+## Setup
+
+```zsh
+make setup
+```
+
+## Run server
+
+```zsh
+make start
+# Open http://localhost:8081
+```z

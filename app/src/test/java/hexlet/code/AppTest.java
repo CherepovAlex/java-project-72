@@ -41,7 +41,8 @@ public final class AppTest {
     private static Javalin app;
     private static String baseUrl;
     private static final String CORRECT_URL = "https://www.google.com";
-    private static final String URL_FOR_NON_EXISTING_ENTITY_TEST = "https://www.dzen.ru";
+    private static final String URL_FOR_NON_EXISTING_ENTITY_TEST = "https://www.yandex.ru";
+    private static final String EXISTING_URL = "https://existing-url.com";
     private static final String WRONG_URL = "htp:/invalid.url";
 
     private static Path getFixturePath(String fileName) {
@@ -83,9 +84,14 @@ public final class AppTest {
         UrlRepository.truncateDB();
         UrlCheckRepository.truncateDB();
 
+        // Добавляем несколько URL для тестов
         Url firstUrl = new Url(CORRECT_URL);
         firstUrl.setCreatedAt(new Timestamp(System.currentTimeMillis()));
         UrlRepository.save(firstUrl);
+
+        Url secondUrl = new Url(EXISTING_URL);
+        secondUrl.setCreatedAt(new Timestamp(System.currentTimeMillis()));
+        UrlRepository.save(secondUrl);
     }
 
     // тривиальный тест
@@ -100,6 +106,25 @@ public final class AppTest {
         // Для GET-запросов с простым телом закрывать ничего не нужно
         HttpResponse<String> response = Unirest.get(baseUrl).asString();
         assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_OK);
+    }
+
+    // Тесты для обработчиков ошибок
+    @Test
+    public void testInternalServerErrorHandler() {
+        app.get("/test-500", ctx -> {
+            throw new RuntimeException("Test error");
+        });
+
+        HttpResponse<String> response = Unirest.get(baseUrl + "/test-500").asString();
+        assertThat(response.getStatus()).isEqualTo(500);
+        assertThat(response.getBody()).contains("Internal server error");
+    }
+
+    @Test
+    public void testNotFoundHandler() {
+        HttpResponse<String> response = Unirest.get(baseUrl + "/non-existent-route").asString();
+        assertThat(response.getStatus()).isEqualTo(404);
+        assertThat(response.getBody()).contains("Not found");
     }
 
     // тест для контроллера URL
@@ -156,6 +181,7 @@ public final class AppTest {
 
             assertThat(getQueryStatus).isEqualTo(HttpServletResponse.SC_OK);
             assertThat(body).contains(CORRECT_URL);
+            assertThat(body).contains(EXISTING_URL);
         }
 
         // отображение URL
@@ -186,6 +212,29 @@ public final class AppTest {
             UrlRepository.delete(idForDeletion);
             response = Unirest.get(baseUrl + "/urls/" + idForDeletion).asString();
             assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_NOT_FOUND);
+        }
+    }
+
+    @Test
+    public void testShowNonExistentUrl() {
+        HttpResponse<String> response = Unirest.get(baseUrl + "/urls/9999").asString();
+        assertThat(response.getStatus()).isEqualTo(404);
+        assertThat(response.getBody()).contains("Not found");
+    }
+
+    @Test
+    public void testCreateExistingUrl() {
+        HttpRequest request = Unirest.post(baseUrl + "/urls")
+                .field("url", EXISTING_URL);
+
+        try {
+            HttpResponse<String> response = request.asString();
+            assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_FOUND);
+
+            HttpResponse<String> urlsResponse = Unirest.get(baseUrl + "/urls").asString();
+            assertThat(urlsResponse.getBody()).contains("Страница уже существует");
+        } catch (UnirestException e) {
+            throw new RuntimeException("Request failed", e);
         }
     }
 
