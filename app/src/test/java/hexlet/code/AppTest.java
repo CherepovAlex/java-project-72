@@ -240,6 +240,21 @@ public final class AppTest {
             assertThat(body).contains(CORRECT_URL);
             assertThat(body).contains(EXISTING_URL);
         }
+        // отображение пустого url
+        @Test
+        public void testShowEmptyUrls() throws SQLException {
+            // Очищаем базу
+            UrlRepository.truncateDB();
+            UrlCheckRepository.truncateDB();
+
+            HttpResponse<String> response = Unirest.get(baseUrl + "/urls").asString();
+            String body = response.getBody();
+
+            assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_OK);
+            assertThat(body)
+                    .contains("Сайты")
+                    .containsPattern("<tbody>\\s*</tbody>"); // Пустая таблица
+        }
 
         // отображение URL
         @Test
@@ -343,6 +358,23 @@ public final class AppTest {
                     .asString();
             assertThat(showResponse.getBody()).contains("Некорректный адрес");
         }
+        // для URL без проверок
+        @Test
+        public void testShowUrlWithoutChecks() throws SQLException {
+            Url url = UrlRepository.findByName(CORRECT_URL).orElseThrow();
+            Long id = url.getId();
+
+            // Удаляем все проверки
+            UrlCheckRepository.truncateDB();
+
+            HttpResponse<String> response = Unirest.get(baseUrl + "/urls/" + id).asString();
+            String body = response.getBody();
+
+            assertThat(body)
+                    .contains(CORRECT_URL)
+                    .containsPattern("<tbody>\\s*</tbody>"); // Пустая таблица проверок
+        }
+
     }
 
     // Тесты для репозиториев
