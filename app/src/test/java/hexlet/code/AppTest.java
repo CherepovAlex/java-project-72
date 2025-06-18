@@ -1,6 +1,7 @@
 package hexlet.code;
 
 import hexlet.code.model.Url;
+import hexlet.code.model.UrlCheck;
 import hexlet.code.repository.UrlCheckRepository;
 import hexlet.code.repository.UrlRepository;
 
@@ -32,6 +33,9 @@ import java.nio.file.Paths;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -281,6 +285,68 @@ public final class AppTest {
                         .as("Описание должно соответствовать фикстуре")
                         .isEqualTo("all right");
             });
+        }
+    }
+    // Тесты для репозиториев
+    @Nested
+    class RepositoryTest {
+        @Test
+        public void testFindLatestChecks() throws SQLException, InterruptedException {
+            Url url1 = new Url("https://example1.com");
+            Url url2 = new Url("https://example2.com");
+            UrlRepository.save(url1);
+            UrlRepository.save(url2);
+
+            UrlCheck check1 = new UrlCheck(200, "Title1", "H1-1", "Desc1", url1.getId());
+            Thread.sleep(100);
+            UrlCheck check2 = new UrlCheck(200, "Title2", "H1-2", "Desc2", url1.getId());
+            UrlCheck check3 = new UrlCheck(404, "Title3", "H1-3", "Desc3", url2.getId());
+
+            UrlCheckRepository.save(check1);
+            UrlCheckRepository.save(check2);
+            UrlCheckRepository.save(check3);
+
+            Map<Long, UrlCheck> latestChecks = UrlCheckRepository.findLatestChecks();
+
+            assertThat(latestChecks).hasSize(2);
+            assertThat(latestChecks.get(url1.getId())).isNotNull();
+            assertThat(latestChecks.get(url1.getId()).getId()).isEqualTo(check2.getId());
+            assertThat(latestChecks.get(url2.getId())).isNotNull();
+            assertThat(latestChecks.get(url2.getId()).getStatusCode()).isEqualTo(404);
+        }
+
+        @Test
+        public void testGetAllChecks() throws SQLException {
+            Url url = new Url("https://example.com");
+            UrlRepository.save(url);
+
+            UrlCheck check1 = new UrlCheck(200, "Title1", "H1-1", "Desc1", url.getId());
+            UrlCheck check2 = new UrlCheck(200, "Title2", "H1-2", "Desc2", url.getId());
+            UrlCheckRepository.save(check1);
+            UrlCheckRepository.save(check2);
+
+            List<UrlCheck> checks = UrlCheckRepository.getAllChecks(url.getId());
+            assertThat(checks).hasSize(2);
+            assertThat(checks.get(0).getCreatedAt().after(checks.get(1).getCreatedAt()));
+        }
+
+        @Test
+        public void testDeleteUrl() throws SQLException {
+            Url url = new Url("https://to-delete.com");
+            UrlRepository.save(url);
+            Long id = url.getId();
+
+            boolean deleted = UrlRepository.delete(id);
+            assertThat(deleted).isTrue();
+
+            Optional<Url> result = UrlRepository.findById(id);
+            assertThat(result).isEmpty();
+        }
+
+        @Test
+        public void testFindByIdNonExistent() throws SQLException {
+            Optional<Url> result = UrlRepository.findById(9999L);
+            assertThat(result).isEmpty();
         }
     }
 }
