@@ -47,7 +47,7 @@ public final class AppTest {
     private static final String CORRECT_URL = "https://www.google.com";
     private static final String URL_FOR_NON_EXISTING_ENTITY_TEST = "https://www.yandex.ru";
     private static final String EXISTING_URL = "https://existing-url.com";
-    private static final String WRONG_URL = "htp:/invalid.url";
+    private static final String WRONG_URL = "htp:/invalid-123456.url";
 
     private static Path getFixturePath(String fileName) {
         return Paths.get("src", "test", "resources", "fixtures", fileName)
@@ -245,7 +245,6 @@ public final class AppTest {
     // тесты для проверки URL
     @Nested
     class UrlCheckControllerTest {
-
         @Test
         public void addUrlCheckTest() throws SQLException, IOException {
             Javalin additionalApp = App.getApp();
@@ -253,40 +252,46 @@ public final class AppTest {
             String url = mockServer.url("/").toString().replaceAll("/$", "");
 
             JavalinTest.test(additionalApp, (server, client) -> {
-                // 1. Добавляем URL
                 String requestBody = "url=" + url;
                 var postResponse = client.post("/urls", requestBody);
                 assertThat(postResponse.code()).isEqualTo(HttpServletResponse.SC_OK);
-                // 2. Получаем добавленный URL
+
                 Url actualUrl = UrlRepository.findByName(url).orElse(null);
-                assertThat(actualUrl)
-                        .as("URL должен быть сохранен в базе")
-                        .isNotNull();
-                // 3. Выполняем проверку URL (изменяем ожидаемый статус на 200)
+                assertThat(actualUrl).isNotNull();
+
                 var checkResponse = client.post("/urls/" + actualUrl.getId() + "/checks");
                 assertThat(checkResponse.code()).isEqualTo(HttpServletResponse.SC_OK);
 
-                // 4. Проверяем, что проверка сохранилась
                 var actualCheck = UrlCheckRepository.findLastCheckByUrlId(actualUrl.getId())
                         .orElse(null);
-                assertThat(actualCheck)
-                        .as("Проверка должна быть сохранена")
-                        .isNotNull();
+                assertThat(actualCheck).isNotNull();
 
-                assertThat(actualCheck.getTitle())
-                        .as("Заголовок страницы должен соответствовать фикстуре")
-                        .isEqualTo("Test page");
-
-                assertThat(actualCheck.getH1())
-                        .as("H1 должен соответствовать фикстуре")
-                        .isEqualTo("Test page.");
-
-                assertThat(actualCheck.getDescription())
-                        .as("Описание должно соответствовать фикстуре")
-                        .isEqualTo("all right");
+                assertThat(actualCheck.getTitle()).isEqualTo("Test page");
+                assertThat(actualCheck.getH1()).isEqualTo("Test page.");
+                assertThat(actualCheck.getDescription()).isEqualTo("all right");
             });
         }
+
+        @Test
+        public void testAddCheckWithInvalidUrl() throws SQLException {
+            Url url = new Url(WRONG_URL);
+            UrlRepository.save(url);
+            Long id = url.getId();
+
+            HttpResponse<String> response = Unirest
+                    .post(baseUrl + "/urls/" + id + "/checks")
+                    .asString();
+
+            assertThat(response.getStatus()).isEqualTo(302);
+            assertThat(response.getHeaders().getFirst("Location")).isEqualTo("/urls/" + id);
+
+            HttpResponse<String> showResponse = Unirest
+                    .get(baseUrl + "/urls/" + id)
+                    .asString();
+            assertThat(showResponse.getBody()).contains("Некорректный адрес");
+        }
     }
+
     // Тесты для репозиториев
     @Nested
     class RepositoryTest {
