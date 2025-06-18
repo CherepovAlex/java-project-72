@@ -62,8 +62,9 @@ public class App {
         // записывается встроенная SQL-строка, которая создает две таблицы: `urls` и `url_checks`
         try {
             file = new File(url.getFile());
-            sql = Files.lines(file.toPath())
-                    .collect(Collectors.joining("\n"));
+            try (var lines = Files.lines(file.toPath())) {
+                sql = lines.collect(Collectors.joining("\n"));
+            }
         } catch (NoSuchFileException e) {
             sql = """
                     DROP TABLE IF EXISTS urls;

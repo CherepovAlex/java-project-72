@@ -53,6 +53,7 @@ public final class AppTest {
         Path filePath = getFixturePath(fileName);
         return Files.readString(filePath).trim();
     }
+
     // запускает приложение и mock-сервер
     @BeforeAll
     public static void beforeAll() throws SQLException, IOException {
@@ -67,6 +68,7 @@ public final class AppTest {
         mockServer.enqueue(mockedResponse);
         mockServer.start();
     }
+
     // останавливает приложение и mock-сервер
     @AfterAll
     public static void afterAll() throws IOException {
@@ -74,6 +76,7 @@ public final class AppTest {
         mockServer.shutdown();
         Unirest.shutDown(); // Закрываем все соединения Unirest
     }
+
     // очищает БД перед каждым тестом
     @BeforeEach
     public void beforeEach() throws SQLException {
@@ -84,11 +87,13 @@ public final class AppTest {
         firstUrl.setCreatedAt(new Timestamp(System.currentTimeMillis()));
         UrlRepository.save(firstUrl);
     }
+
     // тривиальный тест
     @Test
     public void testInit() {
-        assertThat(true).isEqualTo(true);
+        assertThat(app).isNotNull();
     }
+
     // проверяет доступность главной страницы
     @Test
     public void testWelcome() {
@@ -96,6 +101,7 @@ public final class AppTest {
         HttpResponse<String> response = Unirest.get(baseUrl).asString();
         assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_OK);
     }
+
     // тест для контроллера URL
     @Nested
     class UrlControllerTest {
@@ -116,6 +122,7 @@ public final class AppTest {
                 throw new RuntimeException("Request failed", e);
             }
         }
+
         // корректность URL
         @ParameterizedTest
         @ValueSource(strings = {"htp:/invalid.url", "not-a-url", "http://"})
@@ -139,6 +146,7 @@ public final class AppTest {
                 throw new RuntimeException("Request failed", e);
             }
         }
+
         // отображение URLs
         @Test
         public void testShowUrls() {
@@ -149,6 +157,7 @@ public final class AppTest {
             assertThat(getQueryStatus).isEqualTo(HttpServletResponse.SC_OK);
             assertThat(body).contains(CORRECT_URL);
         }
+
         // отображение URL
         @Test
         public void testShowUrlById() throws SQLException {
@@ -179,6 +188,7 @@ public final class AppTest {
             assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_NOT_FOUND);
         }
     }
+
     // тесты для проверки URL
     @Nested
     class UrlCheckControllerTest {
