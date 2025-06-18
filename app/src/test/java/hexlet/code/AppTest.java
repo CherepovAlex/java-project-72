@@ -151,6 +151,59 @@ public final class AppTest {
                 throw new RuntimeException("Request failed", e);
             }
         }
+        // пустой url
+        @Test
+        public void testCreateEmptyUrl() {
+            HttpRequest request = Unirest.post(baseUrl + "/urls")
+                    .field("url", "");  // Пустой URL
+
+            try {
+                HttpResponse<String> response = request.asString();
+                assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_FOUND);
+                assertThat(response.getHeaders().getFirst("Location")).isEqualTo("/");
+
+                // Проверяем flash-сообщение на главной странице
+                HttpResponse<String> homeResponse = Unirest.get(baseUrl).asString();
+                String homeBody = homeResponse.getBody();
+                assertThat(homeBody).contains("URL не может быть пустым");
+
+                // Проверяем, что URL не добавился в список
+                HttpResponse<String> urlsResponse = Unirest.get(baseUrl + "/urls").asString();
+                String urlsBody = urlsResponse.getBody();
+
+                // Проверяем что в списке нет пустого URL
+                assertThat(urlsBody)
+                        .doesNotContain("> </a>")  // Проверка на отсутствие пустой ссылки
+                        .doesNotContain("\"\"");   // Проверка на отсутствие пустых кавычек
+            } catch (UnirestException e) {
+                throw new RuntimeException("Request failed", e);
+            }
+        }
+        // отсутствующий url
+        @Test
+        public void testCreateNullUrl() {
+            HttpRequest request = Unirest.post(baseUrl + "/urls")
+                    .field("url", (String) null);  // Null значение
+
+            try {
+                HttpResponse<String> response = request.asString();
+                assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_FOUND);
+                assertThat(response.getHeaders().getFirst("Location")).isEqualTo("/");
+
+                HttpResponse<String> homeResponse = Unirest.get(baseUrl).asString();
+                assertThat(homeResponse.getBody()).contains("URL не может быть пустым");
+
+                HttpResponse<String> urlsResponse = Unirest.get(baseUrl + "/urls").asString();
+                String urlsBody = urlsResponse.getBody();
+
+                // Проверяем что в списке нет null-значений
+                assertThat(urlsBody)
+                        .doesNotContain("null")
+                        .doesNotContain(">null<");
+            } catch (UnirestException e) {
+                throw new RuntimeException("Request failed", e);
+            }
+        }
 
         // корректность URL
         @ParameterizedTest
