@@ -59,7 +59,6 @@ public final class AppTest {
         return Files.readString(filePath).trim();
     }
 
-    // запускает приложение и mock-сервер
     @BeforeAll
     public static void beforeAll() throws SQLException, IOException {
         app = App.getApp();
@@ -74,7 +73,6 @@ public final class AppTest {
         mockServer.start();
     }
 
-    // останавливает приложение и mock-сервер
     @AfterAll
     public static void afterAll() throws IOException {
         app.stop();
@@ -82,13 +80,11 @@ public final class AppTest {
         Unirest.shutDown(); // Закрываем все соединения Unirest
     }
 
-    // очищает БД перед каждым тестом
     @BeforeEach
     public void beforeEach() throws SQLException {
         UrlRepository.truncateDB();
         UrlCheckRepository.truncateDB();
 
-        // Добавляем несколько URL для тестов
         Url firstUrl = new Url(CORRECT_URL);
         firstUrl.setCreatedAt(new Timestamp(System.currentTimeMillis()));
         UrlRepository.save(firstUrl);
@@ -98,21 +94,17 @@ public final class AppTest {
         UrlRepository.save(secondUrl);
     }
 
-    // тривиальный тест
     @Test
     public void testInit() {
         assertThat(app).isNotNull();
     }
 
-    // проверяет доступность главной страницы
     @Test
     public void testWelcome() {
-        // Для GET-запросов с простым телом закрывать ничего не нужно
         HttpResponse<String> response = Unirest.get(baseUrl).asString();
         assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_OK);
     }
 
-    // Тесты для обработчиков ошибок
     @Test
     public void testInternalServerErrorHandler() {
         app.get("/test-500", ctx -> {
@@ -131,10 +123,9 @@ public final class AppTest {
         assertThat(response.getBody()).contains("Not found");
     }
 
-    // тест для контроллера URL
     @Nested
     class UrlControllerTest {
-        // добавление URL
+
         @Test
         public void testCreateUrl() {
             HttpRequest request = Unirest.post(baseUrl + "/urls")
@@ -143,43 +134,35 @@ public final class AppTest {
             try {
                 HttpResponse<String> response = request.asString();
                 assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_FOUND);
-
-                // Проверяем, что URL появился в списке
                 HttpResponse<String> urlsResponse = Unirest.get(baseUrl + "/urls").asString();
                 assertThat(urlsResponse.getBody()).contains(CORRECT_URL);
             } catch (UnirestException e) {
                 throw new RuntimeException("Request failed", e);
             }
         }
-        // пустой url
+
         @Test
         public void testCreateEmptyUrl() {
             HttpRequest request = Unirest.post(baseUrl + "/urls")
-                    .field("url", "");  // Пустой URL
+                    .field("url", "");
 
             try {
                 HttpResponse<String> response = request.asString();
                 assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_FOUND);
                 assertThat(response.getHeaders().getFirst("Location")).isEqualTo("/");
-
-                // Проверяем flash-сообщение на главной странице
                 HttpResponse<String> homeResponse = Unirest.get(baseUrl).asString();
                 String homeBody = homeResponse.getBody();
                 assertThat(homeBody).contains("URL не может быть пустым");
-
-                // Проверяем, что URL не добавился в список
                 HttpResponse<String> urlsResponse = Unirest.get(baseUrl + "/urls").asString();
                 String urlsBody = urlsResponse.getBody();
-
-                // Проверяем что в списке нет пустого URL
                 assertThat(urlsBody)
-                        .doesNotContain("> </a>")  // Проверка на отсутствие пустой ссылки
-                        .doesNotContain("\"\"");   // Проверка на отсутствие пустых кавычек
+                        .doesNotContain("> </a>")
+                        .doesNotContain("\"\"");
             } catch (UnirestException e) {
                 throw new RuntimeException("Request failed", e);
             }
         }
-        // отсутствующий url
+
         @Test
         public void testCreateNullUrl() {
             HttpRequest request = Unirest.post(baseUrl + "/urls")
@@ -196,7 +179,6 @@ public final class AppTest {
                 HttpResponse<String> urlsResponse = Unirest.get(baseUrl + "/urls").asString();
                 String urlsBody = urlsResponse.getBody();
 
-                // Проверяем что в списке нет null-значений
                 assertThat(urlsBody)
                         .doesNotContain("null")
                         .doesNotContain(">null<");
@@ -205,11 +187,9 @@ public final class AppTest {
             }
         }
 
-        // корректность URL
         @ParameterizedTest
         @ValueSource(strings = {"htp:/invalid.url", "not-a-url", "http://"})
         public void testCreateWrongUrl(String url) {
-            // Убираем приведение типа и работаем напрямую с HttpRequest
             HttpRequest request = Unirest.post(baseUrl + "/urls")
                     .field("url", url);
 
@@ -217,11 +197,9 @@ public final class AppTest {
                 HttpResponse<String> response = request.asString();
                 assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_FOUND);
 
-                // Проверяем flash-сообщение
                 HttpResponse<String> getResponse = Unirest.get(baseUrl).asString();
                 assertThat(getResponse.getBody()).contains("Некорректный URL");
 
-                // Проверяем, что URL не добавился в список
                 HttpResponse<String> urlsResponse = Unirest.get(baseUrl + "/urls").asString();
                 assertThat(urlsResponse.getBody()).doesNotContain(url);
             } catch (UnirestException e) {
@@ -229,7 +207,6 @@ public final class AppTest {
             }
         }
 
-        // отображение URLs
         @Test
         public void testShowUrls() {
             HttpResponse<String> response = Unirest.get(baseUrl + "/urls").asString();
@@ -240,10 +217,10 @@ public final class AppTest {
             assertThat(body).contains(CORRECT_URL);
             assertThat(body).contains(EXISTING_URL);
         }
-        // отображение пустого url
+
         @Test
         public void testShowEmptyUrls() throws SQLException {
-            // Очищаем базу
+
             UrlRepository.truncateDB();
             UrlCheckRepository.truncateDB();
 
@@ -253,10 +230,9 @@ public final class AppTest {
             assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_OK);
             assertThat(body)
                     .contains("Сайты")
-                    .containsPattern("<tbody>\\s*</tbody>"); // Пустая таблица
+                    .containsPattern("<tbody>\\s*</tbody>");
         }
 
-        // отображение URL
         @Test
         public void testShowUrlById() throws SQLException {
             Url actualUrl = UrlRepository.findByName(CORRECT_URL).orElseThrow(
@@ -310,7 +286,6 @@ public final class AppTest {
         }
     }
 
-    // тесты для проверки URL
     @Nested
     class UrlCheckControllerTest {
         @Test
@@ -358,13 +333,12 @@ public final class AppTest {
                     .asString();
             assertThat(showResponse.getBody()).contains("Некорректный адрес");
         }
-        // для URL без проверок
+
         @Test
         public void testShowUrlWithoutChecks() throws SQLException {
             Url url = UrlRepository.findByName(CORRECT_URL).orElseThrow();
             Long id = url.getId();
 
-            // Удаляем все проверки
             UrlCheckRepository.truncateDB();
 
             HttpResponse<String> response = Unirest.get(baseUrl + "/urls/" + id).asString();
@@ -377,7 +351,6 @@ public final class AppTest {
 
     }
 
-    // Тесты для репозиториев
     @Nested
     class RepositoryTest {
         @Test

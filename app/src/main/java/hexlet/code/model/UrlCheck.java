@@ -12,10 +12,10 @@ import java.time.Instant;
 public final class UrlCheck {
 
     private Long id;
-    private int statusCode;     // HTTP-статус
-    private String title;       // Заголовок страницы
-    private String h1;          // Заголовок h1
-    private String description; // Мета-описание
+    private int statusCode;
+    private String title;
+    private String h1;
+    private String description;
     private Timestamp createdAt;
     private Long urlId;
 
@@ -27,13 +27,6 @@ public final class UrlCheck {
         this.urlId = urlId;
         this.createdAt = new Timestamp(System.currentTimeMillis());
     }
-
-//    public UrlCheck(int statusCode, String title, String h1, String description) {
-//        this.statusCode = statusCode;
-//        this.title = title;
-//        this.h1 = h1;
-//        this.description = description;
-//    }
 
     public Instant getCreatedAtToInstant() {
         return createdAt != null ? createdAt.toInstant() : null;

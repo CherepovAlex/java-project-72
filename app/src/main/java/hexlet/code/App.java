@@ -1,24 +1,24 @@
 package hexlet.code;
-// классы для работы с пулом соединений HikariCP
+
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
-// контроллеры приложения
+
 import hexlet.code.controllers.RootController;
 import hexlet.code.controllers.UrlController;
 import hexlet.code.controllers.UrlCheckController;
-// базовый репозиторий для работы с БД
+
 import hexlet.code.repository.BaseRepository;
-// Импортирует классы фреймворка Javalin и интеграцию с Thymeleaf
+
 import io.javalin.Javalin;
 import io.javalin.rendering.template.JavalinThymeleaf;
-// Lombok-аннотация для автоматического создания логгера
+
 import lombok.extern.slf4j.Slf4j;
-// Импортирует классы для работы с шаблонизатором Thymeleaf
+
 import nz.net.ultraq.thymeleaf.layoutdialect.LayoutDialect;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.extras.java8time.dialect.Java8TimeDialect;
 import org.thymeleaf.templateresolver.ClassLoaderTemplateResolver;
-// стандартные классы Java для работы с файлами, SQL и потоками
+
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -29,17 +29,15 @@ import java.sql.Statement;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-// аннотация Lombok, которая автоматически создает логгер (переменную `log`) через Lombok
 @Slf4j
 public class App {
-    // константы: порт по умолчанию, режим по умолчанию (production) и дополнительный режим (development).
+
     private static final String DEFAULT_PORT = "8081";
     private static final String DEFAULT_MODE = "production";
     private static final String ADDITIONAL_MODE = "development";
     private static HikariDataSource dataSource;
-    // Создает экземпляр Javalin приложения, запускает приложение на порту, полученном из окружения (или по умолчанию)
+
     public static void main(String[] args) throws SQLException, IOException {
-        // Добавляем обработчик завершения приложения
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             if (dataSource != null) {
                 log.info("Closing database connection pool...");
@@ -47,29 +45,23 @@ public class App {
             }
         }));
         Javalin app = getApp();
-        // Запуск сервера - Точка входа в приложение
         app.start(getPort());
     }
-    //  Проверяет, работает ли приложение в режиме production
+
     private static boolean isProduction() {
         return getMode().equals(DEFAULT_MODE);
     }
-    // Настраивает приложение: конфигурирует и возвращает Javalin приложение
+
     public static Javalin getApp() throws IOException, SQLException {
-        // Создает конфигурацию и пул соединений с БД. Подключается к БД (используя HikariCP).
+
         HikariConfig hikariConfig = new HikariConfig();
         hikariConfig.setJdbcUrl(getDatabaseUrl());
-        // Читает схему БД из файла `schema.sql` или создает стандартную схему, если файл не найден
         dataSource = new HikariDataSource(hikariConfig);
-        // Загрузка схемы базы данных из файла `schema.sql`:
         var url = App.class.getClassLoader().getResource("schema.sql");
 
         File file;
         String sql;
-        // Пытается прочитать файл `schema.sql` из ресурсов
-        // Если файл найден, читает его и объединяет строки в одну строку `sql`
-        // Если файл не найден (бросается `NoSuchFileException`), то в переменную `sql`
-        // записывается встроенная SQL-строка, которая создает две таблицы: `urls` и `url_checks`
+
         if (url != null) {
             try {
                 file = new File(url.getFile());
@@ -82,44 +74,38 @@ public class App {
         } else {
             sql = getDefaultSchema();
         }
-        // Устанавливается соединение с БД и выполняется SQL-скрипт (либо из файла, либо встроенный)
+
         try (Connection connection = dataSource.getConnection();
              Statement statement = connection.createStatement()) {
             statement.execute(sql);
         }
-        // Инициализирует репозиторий. Статическому полю `dataSource` класса `BaseRepository` присваивается
-        // созданный источник данных. Это позволяет репозиториям использовать общий пул соединений
+
         BaseRepository.dataSource = dataSource;
-        // Настраивает Javalin: включает логирование в dev-режиме, подключает Thymeleaf
+
         Javalin app = Javalin.create(config -> {
-            // В конфигурации: если приложение не в production (т.е. в development)
             if (!isProduction()) {
-                // включает логирование в dev-режиме.
                 config.bundledPlugins.enableDevLogging();
             }
-            // Устанавливается рендерер для шаблонов с использованием Thymeleaf
-            // (передается движок шаблонов, созданный в `getTemplateEngine`)
             config.fileRenderer(new JavalinThymeleaf(getTemplateEngine()));
         });
-        // Обработчики ошибок (500 и 404).
+
         app.exception(Exception.class, (e, ctx) -> {
             log.error("Unhandled exception", e);
             ctx.status(500);
             ctx.result("Internal server error");
         });
-        // Обработчики ошибок (500 и 404).
+
         app.error(404, ctx -> {
             ctx.status(404);
             ctx.result("Not found");
         });
-        // Регистрирует маршруты. Добавляет атрибут `ctx` в каждый запрос
+
         addRoutes(app);
-        // Перед обработкой каждого запроса в атрибуты контекста добавляется сам контекст
-        // (для доступа в шаблонах Thymeleaf).
+
         app.before(ctx -> {
             ctx.attribute("ctx", ctx);
         });
-        // Возврат приложения
+
         return app;
     }
     private static String getDefaultSchema() {
@@ -142,53 +128,45 @@ public class App {
             );
             """;
     }
-    // Добавление маршрутов: регистрирует обработчики для различных путей
+
     private static void addRoutes(Javalin app) {
-        // `GET /`: главная страница.
         app.get("/", RootController.welcome);
-        // `GET /urls`: список URL
         app.get("/urls", UrlController.showUrls);
-        // `POST /urls`: добавить URL
         app.post("/urls", UrlController.createUrl);
-        // `GET /urls/{id}`: показать URL по id
         app.get("/urls/{id}", UrlController.showUrlById);
-        // `POST /urls/{id}/checks`: проверить URL
         app.post("/urls/{id}/checks", UrlCheckController.addCheck);
     }
-    // возвращает режим работы (production или development).
-    // т.е. значение переменной окружения `APP_ENV` или `ADDITIONAL_MODE` (development), если переменная не установлена
+
     private static String getMode() {
         return System.getenv()
                 .getOrDefault("APP_ENV", ADDITIONAL_MODE);
     }
-    // возвращает порт из окружения или значение по умолчанию (8081), преобразованное в целое число
+
     private static int getPort() {
         String port = System.getenv().getOrDefault("PORT", DEFAULT_PORT);
         return Integer.parseInt(port);
     }
-    // Получение URL БД из переменных окружения (по умолчанию H2 in-memory).
+
     private static String getDatabaseUrl() {
         return System.getenv()
                 .getOrDefault("JDBC_DATABASE_URL", "jdbc:h2:mem:project");
     }
-    // Создает и настраивает движок шаблонов Thymeleaf
+
     private static TemplateEngine getTemplateEngine() {
-        // Конфигурация шаблонизатора
+
         TemplateEngine templateEngine = new TemplateEngine();
-        // разрешает шаблоны из папки `templates` в classpath, с расширением `.html` и кодировкой UTF-8
         ClassLoaderTemplateResolver templateResolver = new ClassLoaderTemplateResolver();
         templateResolver.setPrefix("/templates/");
         templateResolver.setSuffix(".html");
         templateResolver.setCharacterEncoding("UTF-8");
-        // Добавляются диалекты: `LayoutDialect` (для использования шаблонов с layout) и
-        // `Java8TimeDialect` (для работы с датами Java 8)
-        templateEngine.addTemplateResolver(templateResolver);   // Настройка Thymeleaf
-        templateEngine.addDialect(new LayoutDialect());         // Поддержка макетов
+
+        templateEngine.addTemplateResolver(templateResolver);
+        templateEngine.addDialect(new LayoutDialect());
         templateEngine.addDialect(new Java8TimeDialect());
-        // Возвращает настроенный движок.
+
         return templateEngine;
     }
-    // Добавляем метод для явного закрытия (для тестов)
+
     public static void stop() {
         if (dataSource != null) {
             dataSource.close();
